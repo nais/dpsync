@@ -6,6 +6,7 @@ import (
 	application_nais_io_v1_alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -28,13 +29,26 @@ func NewReconciler(mgr manager.Manager, logger *log.Logger) K8s2kafkaReconciler 
 	}
 }
 
+type Dataproduct struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Team        string            `json:"team"`
+	Datastore   map[string]string `json:"datastore"`
+}
+
 type K8s2kafkaReconciler struct {
 	client.Client
 	Logger  *log.Entry
 	Manager ctrl.Manager
 }
 
-func (r *K8s2kafkaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *K8s2kafkaReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&application_nais_io_v1_alpha1.Application{}).
+		Complete(r)
+}
+
+func (r *K8s2kafkaReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var application application_nais_io_v1_alpha1.Application
 
 	logger := r.Logger.WithFields(log.Fields{
@@ -56,14 +70,34 @@ func (r *K8s2kafkaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return cr, nil
 	}
 
-	err := r.Get(ctx, req.NamespacedName, &application)
+	err := r.Get(context.Background(), req.NamespacedName, &application)
 	switch {
 	case errors.IsNotFound(err):
 		return fail(fmt.Errorf("resource deleted from cluster; noop"), false)
 	case err != nil:
 		return fail(fmt.Errorf("unable to retrieve resource from cluster: %s", err), true)
 	}
-	logger.Infof("Got ourselves a spanking fine app: %v", application.Name)
+	if len(application.Annotations["dp_name"]) > 0 && len(application.Annotations["dp_description"]) > 0 {
+		dp := Dataproduct{}
+		dp.Team = application.Labels["team"]
+		dp.Name = application.Annotations["dp_name"]
+		dp.Description = application.Annotations["dp_description"]
+
+		if len(application.Spec.GCP.Buckets) > 0 {
+			datastore := map[string]string{}
+			datastore["type"] = "bucket"
+			datastore["name"] = application.Spec.GCP.Buckets[0].Name
+			datastore["project_id"] = "xyz"
+		}
+
+		dpJson, err := json.Marshal(&dp)
+		if err != nil {
+			fmt.Errorf("marshalling dataproduct to json: %v", err)
+		}
+
+		logger.Infof("this is our dp: %s", dpJson)
+
+	}
 
 	return ctrl.Result{}, nil
 }

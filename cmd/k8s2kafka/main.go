@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	k8s_to_kafka_application "github.com/nais/k8s-to-kafka/controllers/k8s-to-kafka_application"
 	k8s2kafkametrics "github.com/nais/k8s-to-kafka/pkg/metrics"
 	application_nais_io_v1_alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	"github.com/nais/liberator/pkg/conftools"
@@ -67,18 +68,9 @@ func main() {
 	})
 
 	if err != nil {
-		logger.Errorf("unable to set up aiven client: %s", err)
+		logger.Errorf("creating manager: %s", err)
 		os.Exit(ExitConfig)
 	}
-
-	logger.Info("starting manager")
-	if err := mgr.Start(ctx.Done()); err != nil {
-		logger.Errorln(fmt.Errorf("manager stopped unexpectedly: %s", err))
-		os.Exit(ExitRuntime)
-	}
-	logger.Info("manager started")
-
-	logger.Errorln(fmt.Errorf("manager has stopped"))
 
 	go func() {
 		signals := make(chan os.Signal, 1)
@@ -93,6 +85,20 @@ func main() {
 			}
 		}
 	}()
+
+	reconciler := k8s_to_kafka_application.NewReconciler(mgr, logger)
+	if err := reconciler.SetupWithManager(mgr); err != nil {
+		logger.Errorf("unable to set up reconciler: %s", err)
+	}
+	logger.Info("k8s2kafka Application reconciler setup complete")
+
+	logger.Info("starting manager")
+	if err := mgr.Start(ctx.Done()); err != nil {
+		logger.Errorln(fmt.Errorf("manager stopped unexpectedly: %s", err))
+		os.Exit(ExitRuntime)
+	}
+
+	logger.Errorln(fmt.Errorf("manager has stopped"))
 
 }
 
