@@ -3,10 +3,12 @@ package k8s_to_kafka_application
 import (
 	"context"
 	"fmt"
+	"github.com/nais/k8s-to-kafka/handlers/namespace"
 	application_nais_io_v1_alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -23,9 +25,10 @@ const (
 
 func NewReconciler(mgr manager.Manager, logger *log.Logger) K8s2kafkaReconciler {
 	return K8s2kafkaReconciler{
-		Client:  mgr.GetClient(),
-		Logger:  logger.WithFields(log.Fields{"component": "K8s2kafkaReconciler"}),
-		Manager: mgr,
+		Client:   mgr.GetClient(),
+		Logger:   logger.WithFields(log.Fields{"component": "dpsync"}),
+		Manager:  mgr,
+		Recorder: mgr.GetEventRecorderFor("dpsync"),
 	}
 }
 
@@ -38,8 +41,9 @@ type Dataproduct struct {
 
 type K8s2kafkaReconciler struct {
 	client.Client
-	Logger  *log.Entry
-	Manager ctrl.Manager
+	Logger   *log.Entry
+	Manager  ctrl.Manager
+	Recorder record.EventRecorder
 }
 
 func (r *K8s2kafkaReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -69,8 +73,9 @@ func (r *K8s2kafkaReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 		return cr, nil
 	}
+	ctx := context.Background()
 
-	err := r.Get(context.Background(), req.NamespacedName, &application)
+	err := r.Get(ctx, req.NamespacedName, &application)
 	switch {
 	case errors.IsNotFound(err):
 		return fail(fmt.Errorf("resource deleted from cluster; noop"), false)
@@ -84,10 +89,17 @@ func (r *K8s2kafkaReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		dp.Description = application.Annotations["dp_description"]
 
 		if len(application.Spec.GCP.Buckets) > 0 {
+			projectId, err := namespace.ReadAnnotation(application.Namespace, "cnrm.cloud.google.com/project-id", r, context.Background())
+			if err != nil {
+				r.Recorder.Eventf(&application, "Warning", "FailedDataProductRegistration", "Getting GoogleProjectID: %s", err)
+				logger.Errorf("reading projectID from namespace: %v", err)
+				return ctrl.Result{}, nil
+			}
 			datastore := map[string]string{}
 			datastore["type"] = "bucket"
-			datastore["name"] = application.Spec.GCP.Buckets[0].Name
-			datastore["project_id"] = "xyz"
+			datastore["bucket_id"] = application.Spec.GCP.Buckets[0].Name
+			datastore["project_id"] = projectId
+			dp.Datastore = datastore
 		}
 
 		dpJson, err := json.Marshal(&dp)

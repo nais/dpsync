@@ -8,15 +8,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type Handler struct{}
-
-func (c *Handler) ReadProject(namespace string, cli client.Client, ctx context.Context) (string, error) {
-	ns := corev1.NamespaceList{}
-	err := cli.List(ctx, &ns, client.InNamespace(namespace))
+func ReadAnnotation(namespace, annotationKey string, cli client.Client, ctx context.Context) (string, error) {
+	key := client.ObjectKey{Name: namespace}
+	ns := corev1.Namespace{}
+	err := cli.Get(ctx, key, &ns)
 	if err != nil {
 		log.Errorf("reading namespace: %v", err)
 		return "", err
 	}
-	fmt.Println(ns.Items[0].Annotations)
-	return "", nil
+
+	annotationValue := ns.Annotations[annotationKey]
+	if annotationValue == "" {
+		return "", fmt.Errorf("annotation %s not found on namespace %s", annotationKey, namespace)
+	}
+
+	return annotationValue, nil
 }

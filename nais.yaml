@@ -10,7 +10,6 @@ metadata:
     team: aura
 spec:
   image: ghcr.io/nais/hello-world:1
-
   gcp:
     buckets:
       - name: dataproductbucket
