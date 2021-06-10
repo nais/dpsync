@@ -7,7 +7,7 @@ require (
 	github.com/prometheus/client_golang v1.0.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.3.2
-	k8s.io/api v0.17.2 // indirect
+	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v0.17.2
 	sigs.k8s.io/controller-runtime v0.5.0

@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	k8s_to_kafka_application "github.com/nais/k8s-to-kafka/controllers/k8s-to-kafka_application"
-	k8s2kafkametrics "github.com/nais/k8s-to-kafka/pkg/metrics"
-	application_nais_io_v1_alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
+	reconcilers "github.com/nais/k8s-to-kafka/controllers/reconcilers"
+	dpsyncMetrics "github.com/nais/k8s-to-kafka/pkg/metrics"
+	naisv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	naisv1Alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	"github.com/nais/liberator/pkg/conftools"
+	schemeutil "github.com/nais/liberator/pkg/scheme"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,12 +16,11 @@ import (
 	"os"
 	"os/signal"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"strings"
 	"syscall"
 )
-
-var scheme = runtime.NewScheme()
 
 type Config struct {
 	LogFormat      string
@@ -28,22 +29,21 @@ type Config struct {
 	SyncPeriod     string
 }
 
-// Configuration options
 const (
-	KubernetesWriteRetryInterval = "kubernetes-write-retry-interval"
-	LogFormat                    = "log-format"
-	LogLevel                     = "log-level"
-	MetricsAddress               = "metrics-address"
-	SyncPeriod                   = "sync-period"
+	MetricsAddress = "metrics-address"
+	SyncPeriod     = "sync-period"
 )
 
 const (
 	ExitOK = iota
-	ExitController
 	ExitConfig
 	ExitRuntime
-	ExitCredentialsManager
 )
+
+func init() {
+	dpsyncMetrics.Register(metrics.Registry)
+	// +kubebuilder:scaffold:scheme
+}
 
 func main() {
 	config := &Config{
@@ -52,23 +52,25 @@ func main() {
 		MetricsAddress: "/metrics",
 		SyncPeriod:     "5",
 	}
-	logger := log.New()
+
+	log := log.New()
 	ctx, cancel := context.WithCancel(context.Background())
-	conftools.Initialize("k8s2kafka")
+	conftools.Initialize("dpsync")
 	err := conftools.Load(config)
 	if err != nil {
 		log.Fatalf("Unable to read configurationn %w", err)
 	}
 
 	syncPeriod := viper.GetDuration(SyncPeriod)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		SyncPeriod:         &syncPeriod,
-		Scheme:             scheme,
+		Scheme:             schemeOrDie(),
 		MetricsBindAddress: viper.GetString(MetricsAddress),
 	})
 
 	if err != nil {
-		logger.Errorf("creating manager: %s", err)
+		log.Errorf("creating manager: %s", err)
 		os.Exit(ExitConfig)
 	}
 
@@ -79,40 +81,50 @@ func main() {
 		for {
 			select {
 			case sig := <-signals:
-				logger.Infof("exiting due to signal: %s", strings.ToUpper(sig.String()))
+				log.Infof("exiting due to signal: %s", strings.ToUpper(sig.String()))
 				cancel()
 				os.Exit(ExitOK)
 			}
 		}
 	}()
 
-	reconciler := k8s_to_kafka_application.NewReconciler(mgr, logger)
-	if err := reconciler.SetupWithManager(mgr); err != nil {
-		logger.Errorf("unable to set up reconciler: %s", err)
+	if err := setupReconcilers(mgr, log); err != nil {
+		log.Fatalf("unable to set up reconciler: %s", err)
 	}
-	logger.Info("k8s2kafka Application reconciler setup complete")
 
-	logger.Info("starting manager")
+	log.Info("starting manager")
 	if err := mgr.Start(ctx.Done()); err != nil {
-		logger.Errorln(fmt.Errorf("manager stopped unexpectedly: %s", err))
+		log.Errorln(fmt.Errorf("manager stopped unexpectedly: %s", err))
 		os.Exit(ExitRuntime)
 	}
 
-	logger.Errorln(fmt.Errorf("manager has stopped"))
-
+	log.Errorln("manager has stopped")
 }
 
-func init() {
-	err := clientgoscheme.AddToScheme(scheme)
-	if err != nil {
-		log.Fatal(err)
+func setupReconcilers(mgr manager.Manager, log *log.Logger) error {
+	applicationReconciler := reconcilers.NewApplicationReconciler(mgr, log)
+	if err := applicationReconciler.SetupWithManager(mgr); err != nil {
+		return err
 	}
 
-	err = application_nais_io_v1_alpha1.AddToScheme(scheme)
+	//naisjobReconciler := reconcilers.NewNaisJobReconciler(mgr, log)
+	//if err := naisjobReconciler.SetupWithManager(mgr); err != nil {
+	//	return err
+	//}
+
+	return nil
+}
+
+func schemeOrDie() *runtime.Scheme {
+	scheme, err := schemeutil.Scheme(
+		naisv1Alpha1.AddToScheme,
+		naisv1.AddToScheme,
+		clientgoscheme.AddToScheme,
+	)
+
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Setting up schemes for required CRDs: %v", err)
 	}
 
-	k8s2kafkametrics.Register(metrics.Registry)
-	// +kubebuilder:scaffold:scheme
+	return scheme
 }

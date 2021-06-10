@@ -1,9 +1,10 @@
-package k8s_to_kafka_application
+package reconcilers
 
 import (
 	"context"
 	"fmt"
 	"github.com/nais/k8s-to-kafka/handlers/namespace"
+	"github.com/nais/k8s-to-kafka/pkg/dataproduct"
 	application_nais_io_v1_alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,15 +17,11 @@ import (
 )
 
 const (
-	requeueInterval    = time.Second * 10
-	secretWriteTimeout = time.Second * 2
-
-	rolloutComplete = "RolloutComplete"
-	rolloutFailed   = "RolloutFailed"
+	requeueInterval = time.Second * 10
 )
 
-func NewReconciler(mgr manager.Manager, logger *log.Logger) K8s2kafkaReconciler {
-	return K8s2kafkaReconciler{
+func NewApplicationReconciler(mgr manager.Manager, logger *log.Logger) ApplicationReconciler {
+	return ApplicationReconciler{
 		Client:   mgr.GetClient(),
 		Logger:   logger.WithFields(log.Fields{"component": "dpsync"}),
 		Manager:  mgr,
@@ -32,27 +29,20 @@ func NewReconciler(mgr manager.Manager, logger *log.Logger) K8s2kafkaReconciler 
 	}
 }
 
-type Dataproduct struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Team        string            `json:"team"`
-	Datastore   map[string]string `json:"datastore"`
-}
-
-type K8s2kafkaReconciler struct {
+type ApplicationReconciler struct {
 	client.Client
 	Logger   *log.Entry
 	Manager  ctrl.Manager
 	Recorder record.EventRecorder
 }
 
-func (r *K8s2kafkaReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&application_nais_io_v1_alpha1.Application{}).
 		Complete(r)
 }
 
-func (r *K8s2kafkaReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var application application_nais_io_v1_alpha1.Application
 
 	logger := r.Logger.WithFields(log.Fields{
@@ -83,7 +73,7 @@ func (r *K8s2kafkaReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return fail(fmt.Errorf("unable to retrieve resource from cluster: %s", err), true)
 	}
 	if len(application.Annotations["dp_name"]) > 0 && len(application.Annotations["dp_description"]) > 0 {
-		dp := Dataproduct{}
+		dp := dataproduct.Dataproduct{}
 		dp.Team = application.Labels["team"]
 		dp.Name = application.Annotations["dp_name"]
 		dp.Description = application.Annotations["dp_description"]
