@@ -1,1 +1,1 @@
-package k8s2kafka
+package dpsync

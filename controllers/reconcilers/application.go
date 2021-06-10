@@ -3,9 +3,9 @@ package reconcilers
 import (
 	"context"
 	"fmt"
-	"github.com/nais/k8s-to-kafka/handlers/namespace"
-	"github.com/nais/k8s-to-kafka/pkg/dataproduct"
-	application_nais_io_v1_alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
+	"github.com/nais/dpsync/handlers/namespace"
+	"github.com/nais/dpsync/pkg/dataproduct"
+	naisV1Alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -38,12 +38,12 @@ type ApplicationReconciler struct {
 
 func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&application_nais_io_v1_alpha1.Application{}).
+		For(&naisV1Alpha1.Application{}).
 		Complete(r)
 }
 
-func (r *ApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	var application application_nais_io_v1_alpha1.Application
+func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var application naisV1Alpha1.Application
 
 	logger := r.Logger.WithFields(log.Fields{
 		"application": req.Name,
@@ -63,7 +63,6 @@ func (r *ApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		}
 		return cr, nil
 	}
-	ctx := context.Background()
 
 	err := r.Get(ctx, req.NamespacedName, &application)
 	switch {

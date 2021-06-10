@@ -3,8 +3,8 @@ package reconcilers
 import (
 	"context"
 	"fmt"
-	"github.com/nais/k8s-to-kafka/handlers/namespace"
-	"github.com/nais/k8s-to-kafka/pkg/dataproduct"
+	"github.com/nais/dpsync/handlers/namespace"
+	"github.com/nais/dpsync/pkg/dataproduct"
 	naisV1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +37,7 @@ func (r *NaisjobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *NaisjobReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *NaisjobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var naisjob naisV1.Naisjob
 
 	logger := r.Logger.WithFields(log.Fields{
@@ -58,7 +58,6 @@ func (r *NaisjobReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 		return cr, nil
 	}
-	ctx := context.Background()
 
 	err := r.Get(ctx, req.NamespacedName, &naisjob)
 	switch {

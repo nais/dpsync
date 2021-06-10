@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	reconcilers "github.com/nais/k8s-to-kafka/controllers/reconcilers"
-	dpsyncMetrics "github.com/nais/k8s-to-kafka/pkg/metrics"
+	"github.com/nais/dpsync/controllers/reconcilers"
+	dpsyncMetrics "github.com/nais/dpsync/pkg/metrics"
 	naisv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	naisv1Alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	"github.com/nais/liberator/pkg/conftools"
@@ -93,7 +93,7 @@ func main() {
 	}
 
 	log.Info("starting manager")
-	if err := mgr.Start(ctx.Done()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		log.Errorln(fmt.Errorf("manager stopped unexpectedly: %s", err))
 		os.Exit(ExitRuntime)
 	}
@@ -107,10 +107,10 @@ func setupReconcilers(mgr manager.Manager, log *log.Logger) error {
 		return err
 	}
 
-	//naisjobReconciler := reconcilers.NewNaisJobReconciler(mgr, log)
-	//if err := naisjobReconciler.SetupWithManager(mgr); err != nil {
-	//	return err
-	//}
+	naisjobReconciler := reconcilers.NewNaisJobReconciler(mgr, log)
+	if err := naisjobReconciler.SetupWithManager(mgr); err != nil {
+		return err
+	}
 
 	return nil
 }
