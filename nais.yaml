@@ -2,9 +2,9 @@ apiVersion: "nais.io/v1alpha1"
 kind: "Application"
 metadata:
   annotations:
-    dp_name: dataproductname
+    dp_name: dataproduct
     dp_description: "fantastically fine description"
-  name: hello-world
+  name: hello-world-1
   namespace: aura
   labels:
     team: aura
@@ -12,6 +12,6 @@ spec:
   image: ghcr.io/nais/hello-world:1
   gcp:
     buckets:
-      - name: dataproductbucket
+      - name: anotherbucket
   ingresses:
   - https://hello-world.dev.nav.no

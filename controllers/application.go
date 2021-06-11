@@ -101,7 +101,9 @@ func (r *ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		dpJson, err := json.Marshal(&dp)
 		if err != nil {
 			fmt.Errorf("marshalling dataproduct to json: %v", err)
+			return ctrl.Result{}, err
 		}
+		r.Producer.Produce(dpJson)
 
 		logger.Infof("this is our dp: %s", dpJson)
 
