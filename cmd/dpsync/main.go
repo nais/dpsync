@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	reconcilers2 "github.com/nais/dpsync/controllers"
+	"github.com/nais/dpsync/pkg/kafka"
 	dpsyncMetrics "github.com/nais/dpsync/pkg/metrics"
 	naisv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	naisv1Alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
@@ -87,8 +88,12 @@ func main() {
 			}
 		}
 	}()
+	kafkaProducer, err := kafka.New([]string{"localhost:9092"}, "dps", nil, log)
+	if err != nil {
+		log.Fatalf("unable to set up kafka producer: %v", err)
+	}
 
-	if err := setupReconcilers(mgr, log); err != nil {
+	if err := setupReconcilers(mgr, log, kafkaProducer); err != nil {
 		log.Fatalf("unable to set up reconciler: %s", err)
 	}
 
@@ -101,13 +106,13 @@ func main() {
 	log.Errorln("manager has stopped")
 }
 
-func setupReconcilers(mgr manager.Manager, log *log.Logger) error {
-	applicationReconciler := reconcilers2.NewApplicationReconciler(mgr, log)
+func setupReconcilers(mgr manager.Manager, log *log.Logger, producer *kafka.Producer) error {
+	applicationReconciler := reconcilers2.NewApplicationReconciler(mgr, log, producer)
 	if err := applicationReconciler.SetupWithManager(mgr); err != nil {
 		return err
 	}
 
-	naisjobReconciler := reconcilers2.NewNaisJobReconciler(mgr, log)
+	naisjobReconciler := reconcilers2.NewNaisJobReconciler(mgr, log, producer)
 	if err := naisjobReconciler.SetupWithManager(mgr); err != nil {
 		return err
 	}

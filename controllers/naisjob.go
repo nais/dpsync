@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/nais/dpsync/handlers/namespace"
 	"github.com/nais/dpsync/pkg/dataproduct"
+	"github.com/nais/dpsync/pkg/kafka"
 	naisV1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -15,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-func NewNaisJobReconciler(mgr manager.Manager, logger *log.Logger) NaisjobReconciler {
+func NewNaisJobReconciler(mgr manager.Manager, logger *log.Logger, producer *kafka.Producer) NaisjobReconciler {
 	return NaisjobReconciler{
 		Client: mgr.GetClient(),
 		Logger: logger.WithFields(
@@ -25,6 +26,7 @@ func NewNaisJobReconciler(mgr manager.Manager, logger *log.Logger) NaisjobReconc
 			}),
 		Manager:  mgr,
 		Recorder: mgr.GetEventRecorderFor("dpsync"),
+		Producer: producer,
 	}
 }
 
@@ -33,6 +35,7 @@ type NaisjobReconciler struct {
 	Logger   *log.Entry
 	Manager  ctrl.Manager
 	Recorder record.EventRecorder
+	Producer *kafka.Producer
 }
 
 func (r *NaisjobReconciler) SetupWithManager(mgr ctrl.Manager) error {

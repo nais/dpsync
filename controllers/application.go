@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/nais/dpsync/handlers/namespace"
 	"github.com/nais/dpsync/pkg/dataproduct"
+	"github.com/nais/dpsync/pkg/kafka"
 	naisV1Alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,9 +21,9 @@ const (
 	requeueInterval = time.Second * 10
 )
 
-func NewApplicationReconciler(mgr manager.Manager, logger *log.Logger) ApplicationReconciler {
+func NewApplicationReconciler(mgr manager.Manager, logger *log.Logger, producer *kafka.Producer) ApplicationReconciler {
 	return ApplicationReconciler{
-		Client:   mgr.GetClient(),
+		Client: mgr.GetClient(),
 		Logger: logger.WithFields(
 			log.Fields{
 				"component":  "dpsync",
@@ -30,6 +31,7 @@ func NewApplicationReconciler(mgr manager.Manager, logger *log.Logger) Applicati
 			}),
 		Manager:  mgr,
 		Recorder: mgr.GetEventRecorderFor("dpsync"),
+		Producer: producer,
 	}
 }
 
@@ -38,6 +40,7 @@ type ApplicationReconciler struct {
 	Logger   *log.Entry
 	Manager  ctrl.Manager
 	Recorder record.EventRecorder
+	Producer *kafka.Producer
 }
 
 func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
