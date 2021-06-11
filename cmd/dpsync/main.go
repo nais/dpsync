@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/nais/dpsync/controllers/reconcilers"
+	reconcilers2 "github.com/nais/dpsync/controllers"
 	dpsyncMetrics "github.com/nais/dpsync/pkg/metrics"
 	naisv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	naisv1Alpha1 "github.com/nais/liberator/pkg/apis/nais.io/v1alpha1"
@@ -58,7 +58,7 @@ func main() {
 	conftools.Initialize("dpsync")
 	err := conftools.Load(config)
 	if err != nil {
-		log.Fatalf("Unable to read configurationn %w", err)
+		log.Fatalf("Unable to read configuration %w", err)
 	}
 
 	syncPeriod := viper.GetDuration(SyncPeriod)
@@ -102,12 +102,12 @@ func main() {
 }
 
 func setupReconcilers(mgr manager.Manager, log *log.Logger) error {
-	applicationReconciler := reconcilers.NewApplicationReconciler(mgr, log)
+	applicationReconciler := reconcilers2.NewApplicationReconciler(mgr, log)
 	if err := applicationReconciler.SetupWithManager(mgr); err != nil {
 		return err
 	}
 
-	naisjobReconciler := reconcilers.NewNaisJobReconciler(mgr, log)
+	naisjobReconciler := reconcilers2.NewNaisJobReconciler(mgr, log)
 	if err := naisjobReconciler.SetupWithManager(mgr); err != nil {
 		return err
 	}
