@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/Shopify/sarama v1.29.0
 	github.com/nais/liberator v0.0.0-20210610115318-a2d5408154c8
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.7.1
 	k8s.io/api v0.21.1
